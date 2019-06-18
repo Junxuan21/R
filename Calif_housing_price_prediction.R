@@ -178,14 +178,14 @@ housing3 <- housing3[, -6:-7 ]
 
 # head(housing3,3)
 
-# perform feature scaling on all numeric predictor variables so that
+# perform feature scaling on all numeric predictor variables so that 
 # the coefficients are given equal weight in ML models
 
 # ?scale
 
 scaled_housing <- scale(housing3[, 1:8])
 
-head(scaled_housing, 3)
+# head(scaled_housing, 3)
 
 cleaned_housing <- cbind(housing3[, 10:14], scaled_housing, housing3[9])
 
@@ -258,8 +258,7 @@ rf$importance
 oob_prediction = predict(rf)
 
 # Now compute the training set RMSE
-train_mse = mean(as.numeric((oob_prediction -
-                               train_y)^2))
+train_mse = mean(as.numeric((oob_prediction - train_y)^2))
 oob_rmse = sqrt(train_mse)
 oob_rmse
 #[1] 49071.56
@@ -268,15 +267,13 @@ oob_rmse
 # The resulting RMSE is the prediction of median price of a house in a given district
 # to within a RMSE delta of the actual median house price.
 
-# Next, using the test data to see how well the model predicts 
-# by computing the test set RMSE
+# Next, using the test data to see how well the model predicts by computing the test set RMSE
 
 test_X <- test_housing[, 1:13]
 test_y <- test_housing[, 14]
 
 y_pred = predict(rf , test_X)
 
-# Now compute the test set RSME
 test_mse = mean(((y_pred - test_y)^2))
 test_rmse = sqrt(test_mse)
 test_rmse
@@ -285,3 +282,4 @@ test_rmse
 # Compare the RMSE for the training and test set, we can see that 
 # the model score roughly the same on the training and testing data,
 # suggesting that it is not overfit and that it makes good predictions.
+
