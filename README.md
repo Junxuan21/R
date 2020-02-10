@@ -1,4 +1,3 @@
-# R for Machine Learning
+# R projects for Data Science & Analytics
 
-# Random Forest Clssification to predict median house price in a given district
-
+This is the repo for my practice files of data anlytics in R.
