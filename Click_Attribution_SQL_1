@@ -1,0 +1,479 @@
+---- script for click attribution logic
+
+CREATE TABLE IF not exists 
+            facade_qe_tmp_table.self_attribute_non_LAT_distinct_20200902_20200908
+as
+with last_click   --- last click
+as 
+(
+   SELECT
+        m1.app as app,
+        m1.app_id as app_id,
+        m1.country_id as country_id,
+        m1.tracking_host as tracking_host,
+        m1.ad_attributed as ad_attributed,
+        m1.attributiontype as attributiontype,
+        m1.ad_id as ad_id,
+        m1.creative_id as creative_id,
+        m1.rit as rit,
+        m1.pricing as pricing,
+        m1.objective_type as objective_type,
+        m1.merge_type as merge_type,
+        m1.platform as platform,
+        m1.os as os,
+        m1.req_id as req_id,
+        m1.device_id as device_id,
+        m1.idfa as idfa,
+        m1.gaid as gaid,
+        m1.idfa_flag as idfa_flag,
+        m1.gaid_flag as gaid_flag,
+        m1.ref_app_id as ref_app_id,
+        m1.partner as partner,
+        m1.event as event,
+        m1.isretargeting as isretargeting,
+        m1.at_dt_show_click as at_dt_show_click,
+        m1.at_dt_attribute as at_dt_attribute,
+        m1.at_show_click as at_show_click,
+        m1.at_attribute as at_attribute,
+        m1.time_gap as time_gap,
+        m1.idfa_giad_combine  as idfa_giad_combine,
+        m2.max_at_show_click  as max_at_show_click 
+   FROM 
+   (
+        SELECT 
+            app,
+            app_id,
+            country_id,
+            tracking_host,
+            ad_attributed,
+            attributiontype,
+            ad_id,
+            creative_id,
+            rit,
+            pricing,
+            objective_type,
+            merge_type,
+            platform,
+            os,
+            req_id,
+            device_id,
+            CASE WHEN (idfa is null or idfa='') THEN 'not_found' ELSE idfa end as idfa,
+            CASE WHEN (gaid is null or gaid='') THEN 'not_found' ELSE gaid end as gaid,
+            idfa_flag,
+            gaid_flag,
+            ref_app_id,
+            partner,
+            event,
+            isretargeting,
+            at_dt_show_click,
+            at_dt_attribute,
+            at_show_click,
+            at_attribute,
+            time_gap,
+            idfa_giad_combine
+        FROM
+            dm_ad.independent_attributed_non_lat_v1
+        where date between '20200511' and '20200517'
+                and os='ios'
+                and merge_type=2  
+                and (at_attribute-at_show_click)>=0 
+                and (at_attribute-at_show_click)< 604800 
+   )m1 
+   INNER JOIN  -- inner join only keep the click that is closest to any given convert 
+   (
+        SELECT 
+            device_id, 
+            CASE WHEN (idfa is null or idfa='') THEN 'not_found' ELSE idfa end as idfa,
+            CASE WHEN (gaid is null or gaid='') THEN 'not_found' ELSE gaid end as gaid,
+            partner,
+            app_id,
+            app,
+            country_id,
+            ref_app_id,
+            event,
+            merge_type,
+            platform,
+            max(at_show_click) as max_at_show_click   --- latest click timestamp, yet prior to convert time
+        FROM 
+            dm_ad.independent_attributed_non_LAT_v1 
+        where 
+            date between '20200902' and '20200908'  
+            and os='ios'
+            and merge_type=2
+            and (at_attribute-at_show_click)>=0 
+            and (at_attribute-at_show_click)< 604800   --- click attributed in 7d window
+                
+        GROUP BY merge_type, idfa, gaid, device_id, app, app_id, country_id, ref_app_id, 
+        event, partner, platform, os, at_attribute 
+   ) m2 
+        ---- for deep convert events like launch_event, can occur multiple times per user per ref_app session 
+        ----- with multiple timestamps, should record the latest click and show closest to each convert   
+   
+   ON m1.idfa=m2.idfa and m1.gaid=m2.gaid and m1.partner=m2.partner and m1.ref_app_id=m2.ref_app_id 
+       and m1.app_id=m2.app_id and m1.country_id=m2.country_id and m1.app=m2.app and m1.event=m2.event 
+       and m1.at_show_click=m2.max_at_show_click and m1.merge_type=m2.merge_type
+),
+
+
+last_view 
+as
+(
+  SELECT 
+        m1.app as app,
+        m1.app_id as app_id,
+        m1.country_id as country_id,
+        m1.tracking_host as tracking_host,
+        m1.ad_attributed as ad_attributed,
+        m1.attributiontype as attributiontype,
+        m1.ad_id as ad_id,
+        m1.creative_id as creative_id,
+        m1.rit as rit,
+        m1.pricing as pricing,
+        m1.objective_type as objective_type,
+        m1.merge_type as merge_type,
+        m1.platform as platform,
+        m1.os as os,
+        m1.req_id as req_id,
+        m1.device_id as device_id,
+        m1.idfa as idfa,
+        m1.gaid as gaid,
+        m1.idfa_flag as idfa_flag,
+        m1.gaid_flag as gaid_flag,
+        m1.ref_app_id as ref_app_id,
+        m1.partner as partner,
+        m1.event as event,
+        m1.isretargeting as isretargeting,
+        m1.at_dt_show_click as at_dt_show_click,
+        m1.at_dt_attribute as at_dt_attribute,
+        m1.at_show_click as at_show_click,
+        m1.at_attribute as at_attribute,
+        m1.time_gap as time_gap,
+        m1.idfa_giad_combine  as idfa_giad_combine,
+        m2.max_at_show_click  as max_at_show_click 
+   
+   FROM 
+   (
+        SELECT 
+            app,
+            app_id,
+            country_id,
+            tracking_host,
+            ad_attributed,
+            attributiontype,
+            ad_id,
+            creative_id,
+            rit,
+            pricing,
+            objective_type,
+            merge_type,
+            platform,
+            os,
+            req_id,
+            device_id,
+            CASE WHEN (idfa is null or idfa='') THEN 'not_found' ELSE idfa end as idfa,
+            CASE WHEN (gaid is null or gaid='') THEN 'not_found' ELSE gaid end as gaid,
+            idfa_flag,
+            gaid_flag,
+            ref_app_id,
+            partner,
+            event,
+            isretargeting,
+            at_dt_show_click,
+            at_dt_attribute,
+            at_show_click,
+            at_attribute,
+            time_gap,
+            idfa_giad_combine
+        FROM
+            dm_ad.independent_attributed_non_lat_v1
+        WHERE 
+            date between '20200511' and '20200517'
+            and os='ios'
+            and merge_type=1
+            and (at_attribute-at_show_click)>=0 
+            and (at_attribute-at_show_click)< 86400 
+   )m1 
+   INNER JOIN  -- inner join only keep the click that is closest to any given convert 
+   (
+        SELECT 
+            device_id, 
+            case when (idfa is null or idfa='') then 'not_found' else idfa  end as idfa,
+            case when (gaid is null or gaid='') then 'not_found' else gaid end as gaid,
+            app_id,
+            app,
+            country_id,
+            ref_app_id,
+            event,
+            merge_type,
+            platform,
+            partner,
+            max(at_show_click) as max_at_show_click   --- latest click timestamp, yet prior to convert time
+        FROM 
+            dm_ad.independent_attributed_non_LAT_v1 
+        WHERE 
+            date between '20200511' and '20200517'  
+            and os='ios'
+            and merge_type=1  
+            and (at_attribute-at_show_click)>=0 
+            and (at_attribute-at_show_click)< 86400    --- click attributed in 7d window as above
+    GROUP BY 
+        merge_type, partner, idfa, gaid, device_id, app, app_id, country_id, 
+        ref_app_id, event, platform, os, at_attribute 
+   ) m2 
+        ---- for deep convert events like launch_event, can occur multiple times per user per ref_app session 
+        ----- with multiple timestamps, should record the latest click and show closest to each convert   
+  ON 
+       m1.idfa=m2.idfa and m1.gaid=m2.gaid and m1.partner=m2.partner and m1.ref_app_id=m2.ref_app_id 
+       and m1.app_id=m2.app_id and m1.country_id=m2.country_id and m1.app=m2.app and m1.event=m2.event 
+       and m1.at_show_click=m2.max_at_show_click and m1.merge_type=m2.merge_type
+)
+
+
+----  if meet both 1 and 2 at the same, only keep click then
+----  all_click. +. view_only 
+
+SELECT
+            'self_attribute_click' as self_atttribute_type,
+            app,
+            app_id,
+            country_id,
+            tracking_host,
+            ad_attributed,
+            attributiontype,
+            ad_id,
+            creative_id,
+            rit,
+            pricing,
+            objective_type,
+            merge_type,
+            platform,
+            os,
+            req_id,
+            device_id,
+            idfa,
+            gaid,
+            idfa_flag,
+            gaid_flag,
+            ref_app_id,
+            partner,
+            event,
+            isretargeting,
+            at_dt_show_click,
+            at_dt_attribute,
+            at_show_click,
+            at_attribute, 
+            time_gap,
+            idfa_giad_combine,
+            max_at_show_click   --- the latest click timestamp
+FROM 
+    last_click 
+
+GROUP BY
+            app,
+            app_id,
+            country_id,
+            tracking_host,
+            ad_attributed,
+            attributiontype,
+            ad_id,
+            creative_id,
+            rit,
+            pricing,
+            objective_type,
+            merge_type,
+            platform,
+            os,
+            req_id,
+            device_id,
+            idfa,
+            gaid,
+            idfa_flag,
+            gaid_flag,
+            ref_app_id,
+            partner,
+            event,
+            isretargeting,
+            at_dt_show_click,
+            at_dt_attribute,
+            at_show_click,
+            at_attribute, 
+            time_gap,
+            idfa_giad_combine,
+            max_at_show_click 
+    
+  UNION ALL 
+  
+  SELECT
+        'self_attribute_view' as self_atttribute_type,
+        t1.app,
+        t1.app_id,
+        t1.country_id,
+        t1.tracking_host,
+        t1.ad_attributed,
+        t1.attributiontype,     
+        t1.ad_id,
+        t1.creative_id,
+        t1.rit,
+        t1.pricing,
+        t1.objective_type,
+        t1.merge_type,
+        t1.platform,
+        t1.os,
+        t1.req_id,
+        t1.device_id,
+        t1.idfa,
+        t1.gaid,
+        t1.idfa_flag,
+        t1.gaid_flag,
+        t1.ref_app_id,
+        t1.partner,
+        t1.event,
+        t1.isretargeting,
+        t1.at_dt_show_click,
+        t1.at_dt_attribute,
+        t1.at_show_click,
+        t1.at_attribute, 
+        t1.time_gap,
+        t1.idfa_giad_combine,
+        t1.max_at_show_click   
+ FROM
+     (SELECT
+            app,
+            app_id,
+            country_id,
+            tracking_host,
+            ad_attributed,
+            attributiontype,
+            ad_id,
+            creative_id,
+            rit,
+            pricing,
+            objective_type,
+            merge_type,
+            platform,
+            os,
+            req_id,
+            device_id,
+            idfa,
+            gaid,
+            idfa_flag,
+            gaid_flag,
+            ref_app_id,
+            partner,
+            event,
+            isretargeting,
+            at_dt_show_click,
+            at_dt_attribute,
+            at_show_click,
+            at_attribute, 
+            time_gap,
+            idfa_giad_combine,
+            max_at_show_click   
+    FROM
+         last_view  
+    GROUP BY 
+            app,
+            app_id,
+            country_id,
+            tracking_host,
+            ad_attributed,
+            attributiontype,
+            ad_id,
+            creative_id,
+            rit,
+            pricing,
+            objective_type,
+            merge_type,
+            platform,
+            os,
+            req_id,
+            device_id,
+            idfa,
+            gaid,
+            idfa_flag,
+            gaid_flag,
+            ref_app_id,
+            partner,
+            event,
+            isretargeting,
+            at_dt_show_click,
+            at_dt_attribute,
+            at_show_click,
+            at_attribute, 
+            time_gap,
+            idfa_giad_combine,
+            max_at_show_click 
+    )t1
+    LEFT JOIN
+    (
+        SELECT
+            app,
+            app_id,
+            country_id,
+            tracking_host,
+            ad_attributed,
+            attributiontype,
+            ad_id,
+            creative_id,
+            rit,
+            pricing,
+            objective_type,
+            merge_type,
+            platform,
+            os,
+            req_id,
+            device_id,
+            idfa,
+            gaid,
+            idfa_flag,
+            gaid_flag,
+            ref_app_id,
+            partner,
+            event,
+            isretargeting,
+            at_dt_show_click,
+            at_dt_attribute,
+            at_show_click,
+            at_attribute, 
+            time_gap,
+            idfa_giad_combine,
+            max_at_show_click  
+        FROM 
+            last_click 
+        GROUP BY  
+            app,
+            app_id,
+            country_id,
+            tracking_host,
+            ad_attributed,
+            attributiontype,
+            ad_id,
+            creative_id,
+            rit,
+            pricing,
+            objective_type,
+            merge_type,
+            platform,
+            os,
+            req_id,
+            device_id,
+            idfa,
+            gaid,
+            idfa_flag,
+            gaid_flag,
+            ref_app_id,
+            partner,
+            event,
+            isretargeting,
+            at_dt_show_click,
+            at_dt_attribute,
+            at_show_click,
+            at_attribute, 
+            time_gap,
+            idfa_giad_combine,
+            max_at_show_click 
+    )t2
+    ON 
+        t1.ref_app_id=t2.ref_app_id and t1.event=t2.event and t1.idfa=t2.idfa and t1.gaid=t2.gaid and t1.partner=t2.partner 
+    WHERE
+        t2.ref_app_id is null   ---- where view is attributed but not click
